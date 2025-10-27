@@ -69,6 +69,47 @@ def render_payload_to_image(payload: Dict[str, Any]):
     return Image.open(io.BytesIO(data))
 
 
+def compose_for_display(source: Image.Image, target_resolution: tuple[int, int], offset_x: float = 0.0, offset_y: float = 0.0) -> Image.Image:
+    """Scale `source` to fit inside `target_resolution` preserving aspect ratio,
+    then paste it onto a background of the target size applying offsets.
+
+    offset_x and offset_y are expected in the range [-1.0, 1.0], where -1
+    aligns the image to the left/top, 0 centers it, and 1 aligns right/bottom.
+    """
+    target_w, target_h = target_resolution
+
+    # Ensure image is in RGB for consistent pasting
+    src = source.convert("RGBA")
+    src_w, src_h = src.size
+
+    # compute scale to fit while preserving aspect ratio
+    scale = min(target_w / src_w, target_h / src_h)
+    new_w = max(1, int(round(src_w * scale)))
+    new_h = max(1, int(round(src_h * scale)))
+
+    resized = src.resize((new_w, new_h), resample=Image.LANCZOS)
+
+    # compute position using offsets
+    # map offset [-1,1] -> position range [0, max_shift]
+    max_dx = max(0, target_w - new_w)
+    max_dy = max(0, target_h - new_h)
+
+    # clamp offsets
+    ox = max(-1.0, min(1.0, offset_x))
+    oy = max(-1.0, min(1.0, offset_y))
+
+    # convert -1..1 to 0..1 then scale
+    px = int(round(((ox + 1.0) / 2.0) * max_dx))
+    py = int(round(((oy + 1.0) / 2.0) * max_dy))
+
+    # create background (white) and paste resized image
+    bg = Image.new("RGBA", (target_w, target_h), (255, 255, 255, 255))
+    bg.paste(resized, (px, py), resized)
+
+    # for Inky drivers, return RGB (no alpha)
+    return bg.convert("RGB")
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     cfg = load_config()
 
@@ -115,10 +156,10 @@ def main(argv: Optional[list[str]] = None) -> int:
                     raise
                 except urllib.error.URLError as e:
                     logger.error("Network error fetching %s: %s", frame_url, e)
-                    logger.info("If the web UI is not running, start it with: uvicorn inky-frame.webui.app:app --host 0.0.0.0 --port 8000")
+                    logger.info("If the web UI is not running, start it with: uvicorn webui.app:app --host 0.0.0.0 --port 8000")
                 except http.client.RemoteDisconnected:
                     logger.error("Remote end closed connection without response when contacting %s", frame_url)
-                    logger.info("Ensure the server is running and reachable; see uvicorn inky-frame.webui.app:app --host 0.0.0.0 --port 8000")
+                    logger.info("Ensure the server is running and reachable; see uvicorn webui.app:app --host 0.0.0.0 --port 8000")
                 except Exception:
                     logger.exception("Unexpected error fetching frame URL %s", frame_url)
 
@@ -139,12 +180,17 @@ def main(argv: Optional[list[str]] = None) -> int:
                 time.sleep(5)
                 continue
 
-            # prepare image for display
+            # prepare image for display: preserve aspect ratio and apply offsets
             try:
-                resized = img.resize(inky.resolution)
+                offset_x = payload.get("offset_x", 0.0) if isinstance(payload.get("offset_x", 0.0), (int, float)) else 0.0
+                offset_y = payload.get("offset_y", 0.0) if isinstance(payload.get("offset_y", 0.0), (int, float)) else 0.0
+                resized = compose_for_display(img, inky.resolution, offset_x=offset_x, offset_y=offset_y)
             except Exception:
-                logger.exception("Failed resizing image; using original")
-                resized = img
+                logger.exception("Failed composing image for display; falling back to naive resize")
+                try:
+                    resized = img.resize(inky.resolution)
+                except Exception:
+                    resized = img
 
             # choose saturation: CLI override > payload.settings.saturation > default 0.5
             sat = args.saturation
