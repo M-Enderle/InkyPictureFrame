@@ -40,7 +40,7 @@ class Config:
     poll_interval: int = int(os.environ.get("INKY_FRAME_POLL_INTERVAL", "60"))
 
 
-def load() -> Config:
+def load_config() -> Config:
     """Return a Config instance using environment overrides."""
     return Config()
 
