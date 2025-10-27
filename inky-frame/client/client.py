@@ -24,6 +24,7 @@ import sys
 import time
 import urllib.request
 from typing import Any, Dict, Optional
+import dotenv
 
 from PIL import Image
 
@@ -31,6 +32,8 @@ from inky.auto import auto
 
 import os
 from dataclasses import dataclass
+
+dotenv.load_dotenv()
 
 
 @dataclass
@@ -43,8 +46,6 @@ class Config:
 def load_config() -> Config:
     """Return a Config instance using environment overrides."""
     return Config()
-
-
 
 logger = logging.getLogger("inky_client")
 
