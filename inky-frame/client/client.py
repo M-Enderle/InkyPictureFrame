@@ -29,7 +29,21 @@ from PIL import Image
 
 from inky.auto import auto
 
-from .config import load as load_config
+import os
+from dataclasses import dataclass
+
+
+@dataclass
+class Config:
+    host: str = os.environ.get("INKY_FRAME_HOST", "127.0.0.1")
+    port: int = int(os.environ.get("INKY_FRAME_PORT", "8000"))
+    poll_interval: int = int(os.environ.get("INKY_FRAME_POLL_INTERVAL", "60"))
+
+
+def load() -> Config:
+    """Return a Config instance using environment overrides."""
+    return Config()
+
 
 
 logger = logging.getLogger("inky_client")
