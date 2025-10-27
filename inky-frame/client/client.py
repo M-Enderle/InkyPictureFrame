@@ -81,8 +81,15 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-    base_url = f"http://{args.host}:{args.port}"
+    # Allow passing a full URL as --host (including scheme), or just a hostname.
+    host_val = args.host or cfg.host
+    if host_val.startswith("http://") or host_val.startswith("https://"):
+        base_url = host_val.rstrip("/")
+    else:
+        base_url = f"http://{host_val}:{args.port}"
+
     frame_url = f"{base_url}/api/frame/current"
+    logger.debug("Using frame URL: %s", frame_url)
 
     # initialize Inky display (asks user to select display if multiple)
     inky = auto(ask_user=True, verbose=args.verbose)
