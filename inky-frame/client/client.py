@@ -23,6 +23,8 @@ import logging
 import sys
 import time
 import urllib.request
+import urllib.error
+import http.client
 from typing import Any, Dict, Optional
 import dotenv
 
@@ -73,6 +75,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Inky Frame polling client")
     parser.add_argument("--host", default=cfg.host, help="Server host")
     parser.add_argument("--port", type=int, default=cfg.port, help="Server port")
+    parser.add_argument("--url", help="Full base URL (e.g. https://example.ngrok.io). Overrides --host/--port if provided")
     parser.add_argument("--interval", "-i", type=int, default=None, help="Polling interval in seconds (overrides server/config)")
     parser.add_argument("--saturation", "-s", type=float, default=None, help="Override saturation when setting image on display")
     parser.add_argument("--once", action="store_true", help="Fetch one frame and exit")
@@ -81,12 +84,16 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-    # Allow passing a full URL as --host (including scheme), or just a hostname.
-    host_val = args.host or cfg.host
-    if host_val.startswith("http://") or host_val.startswith("https://"):
-        base_url = host_val.rstrip("/")
+    # Allow an explicit full URL via --url which takes precedence.
+    if args.url:
+        base_url = args.url.rstrip("/")
     else:
-        base_url = f"http://{host_val}:{args.port}"
+        # Allow passing a full URL as --host (including scheme), or just a hostname.
+        host_val = args.host or cfg.host
+        if host_val.startswith("http://") or host_val.startswith("https://"):
+            base_url = host_val.rstrip("/")
+        else:
+            base_url = f"http://{host_val}:{args.port}"
 
     frame_url = f"{base_url}/api/frame/current"
     logger.debug("Using frame URL: %s", frame_url)
@@ -97,15 +104,30 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     try:
         while True:
-            try:
-                payload = fetch_frame(frame_url)
-            except KeyboardInterrupt:
-                raise
-            except Exception:
-                logger.exception("Failed to fetch frame; retrying in 5s")
+            # fetch with improved error handling and exponential backoff
+            backoff = 5
+            while True:
+                try:
+                    payload = fetch_frame(frame_url)
+                    # success -> break retry loop
+                    break
+                except KeyboardInterrupt:
+                    raise
+                except urllib.error.URLError as e:
+                    logger.error("Network error fetching %s: %s", frame_url, e)
+                    logger.info("If the web UI is not running, start it with: uvicorn inky-frame.webui.app:app --host 0.0.0.0 --port 8000")
+                except http.client.RemoteDisconnected:
+                    logger.error("Remote end closed connection without response when contacting %s", frame_url)
+                    logger.info("Ensure the server is running and reachable; see uvicorn inky-frame.webui.app:app --host 0.0.0.0 --port 8000")
+                except Exception:
+                    logger.exception("Unexpected error fetching frame URL %s", frame_url)
+
                 if args.once:
                     return 2
-                time.sleep(5)
+
+                logger.info("Retrying in %ds...", backoff)
+                time.sleep(backoff)
+                backoff = min(backoff * 2, 60)
                 continue
 
             try:
