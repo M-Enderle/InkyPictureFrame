@@ -39,16 +39,26 @@ def crop_image_to_display(image_path: str, display) -> str:
 
 def main():
     while True:
+
         image_ids = get_image_ids()
+
+        if not image_ids:
+            print("No images found in the specified album.")
+            time.sleep(60)
+            continue
+
         random_id = random.choice(image_ids)
         file_path = download_image(random_id)
+
         if file_path:
             print(f"Displaying image {random_id} from {file_path}")
             cropped_image = crop_image_to_display(file_path, display)
             display.set_image(cropped_image)
             display.show()
+
         else:
             print(f"Failed to download image {random_id}")
+            
         time.sleep(30)
 
 
