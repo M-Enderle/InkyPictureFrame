@@ -1,5 +1,5 @@
 [project]
-name = "inky-frame"
+name = "frame"
 version = "0.1.0"
 description = ""
 authors = [
@@ -13,10 +13,10 @@ dependencies = [
     "jinja2>=3.1.0,<4.0.0",
     "python-multipart>=0.0.9,<0.0.12",
     "pillow (>=12.0.0,<13.0.0)",
+    "requests (>=2.32.5,<3.0.0)",
+    "immich-python-sdk (>=1.134.0,<2.0.0)",
+    "python-dotenv (>=1.0.0,<2.0.0)",
 ]
-
-[tool.poetry]
-packages = [{include = "client", from = "inky-frame"}, {include = "webui", from = "inky-frame"}]
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
