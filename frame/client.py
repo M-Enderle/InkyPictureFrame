@@ -31,7 +31,7 @@ def crop_image_to_display(image_path: str, display) -> str:
         bottom = (img.height + new_height) / 2
 
         img_cropped = img.crop((left, top, right, bottom))
-        img_resized = img_cropped.resize(resolution, Image.ANTIALIAS)
+        img_resized = img_cropped.resize(resolution)
 
         return img_resized
 
