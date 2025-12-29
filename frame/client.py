@@ -1,22 +1,33 @@
+import os
 import random
+import subprocess
 import time
 
 from immich import get_image_ids, download_image
 from PIL import Image
-from pillow_heif import register_heif_opener
-
-register_heif_opener()
 
 from dotenv import load_dotenv
 from inky.auto import auto
 
 load_dotenv()
 display = auto()
+ORIENTATION = os.getenv("ORIENTATION", "landscape").lower()
+
+
+def convert_heic_to_jpg(heic_path: str) -> str:
+    """Convert HEIC file to JPG using ImageMagick."""
+    jpg_path = heic_path.rsplit(".", 1)[0] + ".jpg"
+    subprocess.run(["convert", heic_path, jpg_path], check=True)
+    os.remove(heic_path)
+    return jpg_path
 
 print(f"Detected Inky display: {display}")
 
-def crop_image_to_display(image_path: str, display) -> str:
+def crop_image_to_display(image_path: str, display) -> Image.Image:
     resolution = display.resolution
+    if ORIENTATION == "portrait":
+        resolution = (resolution[1], resolution[0])
+
     with Image.open(image_path) as img:
         img_ratio = img.width / img.height
         display_ratio = resolution[0] / resolution[1]
@@ -36,6 +47,9 @@ def crop_image_to_display(image_path: str, display) -> str:
         img_cropped = img.crop((left, top, right, bottom))
         img_resized = img_cropped.resize(resolution)
 
+        if ORIENTATION == "portrait":
+            img_resized = img_resized.rotate(90, expand=True)
+
         return img_resized
 
 
@@ -54,6 +68,8 @@ def main():
         file_path = download_image(random_id)
 
         if file_path:
+            if file_path.lower().endswith((".heic", ".heif")):
+                file_path = convert_heic_to_jpg(file_path)
             print(f"Displaying image {random_id} from {file_path}")
             cropped_image = crop_image_to_display(file_path, display)
             display.set_image(cropped_image)
