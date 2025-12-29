@@ -3,6 +3,9 @@ import time
 
 from immich import get_image_ids, download_image
 from PIL import Image
+from pillow_heif import register_heif_opener
+
+register_heif_opener()
 
 from dotenv import load_dotenv
 from inky.auto import auto
