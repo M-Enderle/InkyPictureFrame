@@ -1,0 +1,7 @@
+fastapi>=0.111
+uvicorn>=0.29
+pillow>=10.0
+requests>=2.31
+python-dotenv>=1.0
+zeroconf>=0.130
+# Pimoroni "inky" is installed in the Pimoroni virtualenv; LED support: gpiozero + lgpio

@@ -1,0 +1,113 @@
+{
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "user": {
+        "title": "Inky Frame verbinden",
+        "description": "Adresse des Raspberry Pi eingeben. Das API-Token zeigt der Pi mit `python -m frame token` an.",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "token": "API-Token"
+        }
+      },
+      "zeroconf_confirm": {
+        "title": "Inky Frame gefunden",
+        "description": "**{name}** unter {host} gefunden. API-Token eingeben (`python -m frame token` auf dem Pi).",
+        "data": {
+          "token": "API-Token"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Inky Frame neu anmelden",
+        "description": "Das API-Token wurde abgelehnt. Bitte das aktuelle Token eingeben.",
+        "data": {
+          "token": "API-Token"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Der Bilderrahmen ist nicht erreichbar. Läuft der Dienst?",
+      "invalid_auth": "Das API-Token ist falsch.",
+      "not_inky_frame": "Das ist kein Inky Frame."
+    },
+    "abort": {
+      "already_configured": "Dieser Bilderrahmen ist bereits eingerichtet.",
+      "not_inky_frame": "Das ist kein Inky Frame.",
+      "reauth_successful": "Anmeldung erfolgreich erneuert."
+    }
+  },
+  "entity": {
+    "button": {
+      "next_photo": {
+        "name": "Nächstes Foto"
+      },
+      "previous_photo": {
+        "name": "Vorheriges Foto"
+      },
+      "reload_album": {
+        "name": "Album neu laden"
+      }
+    },
+    "switch": {
+      "display": {
+        "name": "Display"
+      },
+      "slideshow": {
+        "name": "Automatischer Wechsel"
+      }
+    },
+    "number": {
+      "interval": {
+        "name": "Wechselintervall"
+      }
+    },
+    "select": {
+      "orientation": {
+        "name": "Ausrichtung",
+        "state": {
+          "landscape": "Querformat",
+          "portrait": "Hochformat"
+        }
+      },
+      "album": {
+        "name": "Album"
+      }
+    },
+    "light": {
+      "led": {
+        "name": "LED"
+      }
+    },
+    "image": {
+      "photo": {
+        "name": "Foto"
+      }
+    },
+    "sensor": {
+      "status": {
+        "name": "Status",
+        "state": {
+          "starting": "Startet",
+          "idle": "Bereit",
+          "updating": "Aktualisiert",
+          "off": "Aus",
+          "error": "Fehler"
+        }
+      },
+      "current_photo": {
+        "name": "Aktuelles Foto"
+      },
+      "album_count": {
+        "name": "Fotos im Album",
+        "unit_of_measurement": "Fotos"
+      },
+      "last_change": {
+        "name": "Letzter Wechsel"
+      },
+      "next_change": {
+        "name": "Nächster Wechsel"
+      }
+    }
+  }
+}

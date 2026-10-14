@@ -1,0 +1,69 @@
+{
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "user": {
+        "title": "Connect Inky Frame",
+        "description": "Enter the address of your Raspberry Pi. Show the API token on the Pi with `python -m frame token`.",
+        "data": { "host": "Host", "port": "Port", "token": "API token" }
+      },
+      "zeroconf_confirm": {
+        "title": "Inky Frame found",
+        "description": "Found **{name}** at {host}. Enter its API token (`python -m frame token` on the Pi).",
+        "data": { "token": "API token" }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate Inky Frame",
+        "description": "The API token was rejected. Enter the current token.",
+        "data": { "token": "API token" }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot reach the frame. Is the service running?",
+      "invalid_auth": "The API token is wrong.",
+      "not_inky_frame": "This is not an Inky Frame."
+    },
+    "abort": {
+      "already_configured": "This frame is already configured.",
+      "not_inky_frame": "This is not an Inky Frame.",
+      "reauth_successful": "Re-authentication successful."
+    }
+  },
+  "entity": {
+    "button": {
+      "next_photo": { "name": "Next photo" },
+      "previous_photo": { "name": "Previous photo" },
+      "reload_album": { "name": "Reload album" }
+    },
+    "switch": {
+      "display": { "name": "Display" },
+      "slideshow": { "name": "Automatic change" }
+    },
+    "number": { "interval": { "name": "Change interval" } },
+    "select": {
+      "orientation": {
+        "name": "Orientation",
+        "state": { "landscape": "Landscape", "portrait": "Portrait" }
+      },
+      "album": { "name": "Album" }
+    },
+    "light": { "led": { "name": "LED" } },
+    "image": { "photo": { "name": "Photo" } },
+    "sensor": {
+      "status": {
+        "name": "Status",
+        "state": {
+          "starting": "Starting",
+          "idle": "Idle",
+          "updating": "Updating",
+          "off": "Off",
+          "error": "Error"
+        }
+      },
+      "current_photo": { "name": "Current photo" },
+      "album_count": { "name": "Photos in album", "unit_of_measurement": "photos" },
+      "last_change": { "name": "Last change" },
+      "next_change": { "name": "Next change" }
+    }
+  }
+}

@@ -25,7 +25,7 @@ fi
 # Install system dependencies
 echo "=== Installing system dependencies ==="
 apt-get update
-apt-get install -y imagemagick libheif1 python3-dev
+apt-get install -y imagemagick libheif1 python3-dev swig liblgpio-dev
 
 # Create images directory
 echo "=== Creating directories ==="
@@ -36,7 +36,9 @@ chown -R "$USER:$USER" "$SCRIPT_DIR/images" "$SCRIPT_DIR/logs"
 # Install Python dependencies
 echo "=== Installing Python dependencies ==="
 sudo -u "$USER" "$VENV_PATH/bin/pip" install --upgrade pip
-sudo -u "$USER" "$VENV_PATH/bin/pip" install pillow requests immich-python-sdk python-dotenv
+sudo -u "$USER" "$VENV_PATH/bin/pip" install -r "$SCRIPT_DIR/requirements.txt"
+# Optional: dimmable LED support (only needed when LED_GPIO is set in .env)
+sudo -u "$USER" "$VENV_PATH/bin/pip" install gpiozero lgpio || echo "WARNING: LED support not installed (gpiozero/lgpio failed)"
 
 # Create systemd service file
 echo "=== Creating systemd service ==="
@@ -49,17 +51,17 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=$USER
-WorkingDirectory=$SCRIPT_DIR/frame
+WorkingDirectory=$SCRIPT_DIR
 Environment="PATH=$VENV_PATH/bin:/usr/local/bin:/usr/bin:/bin"
-ExecStart=$VENV_PATH/bin/python client.py
+ExecStart=$VENV_PATH/bin/python -m frame
 
 # Restart on failure
 Restart=always
 RestartSec=10
 
-# Logging
-StandardOutput=append:$SCRIPT_DIR/logs/frame.log
-StandardError=append:$SCRIPT_DIR/logs/frame.log
+# Logging: the app writes logs/frame.log itself (rotating); stdout goes to journald
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
@@ -80,6 +82,7 @@ if [ ! -f "$SCRIPT_DIR/frame/.env" ]; then
     echo "  IMMICH_API_KEY=your-api-key"
     echo "  ALBUM_ID=your-album-id"
     echo "  ORIENTATION=landscape  # or portrait"
+    echo "(see frame/.env.example)"
     echo ""
 fi
 
@@ -94,3 +97,6 @@ echo "  Logs:    tail -f $SCRIPT_DIR/logs/frame.log"
 echo ""
 echo "The service will start automatically on boot."
 echo "To start now, run: sudo systemctl start $SERVICE_NAME"
+echo ""
+echo "Home Assistant: add the 'Inky Picture Frame' integration (HACS) and enter the API token:"
+echo "  sudo -u $USER $VENV_PATH/bin/python -m frame token   (run from $SCRIPT_DIR)"

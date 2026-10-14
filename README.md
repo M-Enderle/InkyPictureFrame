@@ -9,6 +9,7 @@ A Raspberry Pi–powered digital picture frame that displays random photos from 
 - Automatically converts HEIC/HEIF images to JPEG via ImageMagick
 - Runs as a systemd service with automatic restart on failure
 - Rotating log files for easy debugging
+- **Home Assistant integration** (custom component): live preview, next/previous, display on/off, interval, album, orientation, optional dimmable LED — see [docs/home-assistant.md](docs/home-assistant.md)
 
 ## Hardware Requirements
 
@@ -36,7 +37,7 @@ A Raspberry Pi–powered digital picture frame that displays random photos from 
 2. **Create the configuration file** (see [Configuration](#configuration)):
 
    ```bash
-   cp frame/.env.example frame/.env   # or create from scratch
+   cp frame/.env.example frame/.env
    nano frame/.env
    ```
 
@@ -76,6 +77,10 @@ Create `frame/.env` with the following variables:
 | `IMMICH_API_KEY` | Yes      | —           | API key generated in Immich → Account → API Keys |
 | `ALBUM_ID`       | Yes      | —           | UUID of the Immich album to display photos from  |
 | `ORIENTATION`    | No       | `landscape` | `landscape` or `portrait`                        |
+| `INTERVAL_MINUTES` | No     | `15`        | Minutes between photos (3–1440)                  |
+| `API_PORT`       | No       | `8765`      | Port of the Home Assistant API                   |
+| `FRAME_API_TOKEN`| No       | generated   | Token for the API; show it with `python -m frame token` |
+| `LED_GPIO`       | No       | —           | BCM pin of an optional dimmable LED, see [docs/led.md](docs/led.md) |
 
 **Example `frame/.env`:**
 
@@ -105,8 +110,15 @@ The service is configured to restart automatically on failure (10-second delay b
 ```
 InkyPictureFrame/
 ├── frame/
-│   ├── client.py      # Main display loop — fetches and renders images
-│   └── immich.py      # Immich API client (fetch album, download assets)
+│   ├── client.py      # Controller: slideshow loop and state
+│   ├── api.py         # HTTP API for Home Assistant (FastAPI)
+│   ├── immich.py      # Immich REST client
+│   ├── render.py      # Crop/rotate for the panel
+│   ├── display.py     # Inky panel (or mock for development)
+│   ├── led.py         # Optional dimmable LED
+│   └── discovery.py   # mDNS announcement
+├── custom_components/inky_frame/   # Home Assistant integration (HACS)
+├── docs/              # Home Assistant, LED wiring, ideas
 ├── logs/              # Rotating log files (created at install time)
 ├── images/            # Temporary image downloads (created at install time)
 ├── install.sh         # Installation & systemd setup script
@@ -116,11 +128,10 @@ InkyPictureFrame/
 ## How It Works
 
 1. On startup, `client.py` connects to the Inky display via `inky.auto`.
-2. Every 30 seconds the main loop:
-   - Fetches all asset IDs from the configured Immich album.
-   - Picks one at random.
-   - Downloads it to the local `images/` directory.
-   - Converts HEIC/HEIF files to JPEG if necessary.
+2. Every `INTERVAL_MINUTES` (default 15; changeable from Home Assistant) the main loop:
+   - Fetches the image asset IDs of the configured Immich album (videos are skipped).
+   - Picks the next one from a shuffled bag (no repeats until the album is through).
+   - Downloads Immich's display-sized preview (falls back to the original + HEIC→JPEG conversion).
    - Centre-crops and resizes the image to match the display resolution.
    - Rotates the image 90° when `ORIENTATION=portrait`.
    - Pushes the image to the Inky display.
@@ -128,9 +139,10 @@ InkyPictureFrame/
 ## Troubleshooting
 
 - **Display not detected:** Make sure the Inky HAT is properly seated and that the Pimoroni library is installed in the virtual environment used by the service.
-- **API errors:** Check `logs/immich-api.log` for detailed error messages. Verify that `IMMICH_BASE_URL`, `IMMICH_API_KEY`, and `ALBUM_ID` are correct.
+- **API errors:** Check `logs/frame.log` for detailed error messages. Verify that `IMMICH_BASE_URL`, `IMMICH_API_KEY`, and `ALBUM_ID` are correct.
 - **HEIC conversion fails:** Ensure `imagemagick` and `libheif1` are installed (`sudo apt-get install -y imagemagick libheif1`).
 - **Service won't start:** Run `sudo journalctl -u inky-frame -e` or inspect `logs/frame.log`.
+- **Development without hardware:** `MOCK_DISPLAY=1 python -m frame` writes `data/mock_display.png`.
 
 ## License
 

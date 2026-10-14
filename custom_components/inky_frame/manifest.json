@@ -1,0 +1,13 @@
+{
+  "domain": "inky_frame",
+  "name": "Inky Picture Frame",
+  "codeowners": ["@M-Enderle"],
+  "config_flow": true,
+  "documentation": "https://github.com/M-Enderle/InkyPictureFrame",
+  "integration_type": "device",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/M-Enderle/InkyPictureFrame/issues",
+  "requirements": [],
+  "version": "0.2.0",
+  "zeroconf": ["_inkyframe._tcp.local."]
+}
