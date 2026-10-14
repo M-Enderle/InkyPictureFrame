@@ -29,11 +29,14 @@ class ImmichClient:
         self._session.headers["Accept"] = "application/json"
 
     def _get(self, path: str, **kwargs: Any) -> requests.Response:
+        return self._request("GET", path, **kwargs)
+
+    def _request(self, method: str, path: str, **kwargs: Any) -> requests.Response:
         last: Exception | None = None
         for attempt in range(3):
             try:
-                resp = self._session.get(
-                    f"{self.base_url}/api{path}", timeout=self._timeout, **kwargs
+                resp = self._session.request(
+                    method, f"{self.base_url}/api{path}", timeout=self._timeout, **kwargs
                 )
                 if resp.status_code in (401, 403):
                     raise ImmichError("Immich: API-Key ungültig oder ohne Berechtigung")
@@ -58,12 +61,27 @@ class ImmichClient:
         if not album_id:
             raise ImmichError("Kein Album ausgewählt (ALBUM_ID)")
         data = self._get(f"/albums/{album_id}").json()
+        name = data.get("albumName") or album_id
+        assets = data.get("assets") or []  # older Immich versions embed the assets
+        if not assets and data.get("assetCount"):
+            assets = self._search_album(album_id)
         ids = [
             a["id"]
-            for a in data.get("assets") or []
+            for a in assets
             if a.get("type") == "IMAGE" and not a.get("isTrashed")
         ]
-        return data.get("albumName") or album_id, ids
+        return name, ids
+
+    def _search_album(self, album_id: str) -> list[dict[str, Any]]:
+        """Newer Immich versions list album assets only via the metadata search."""
+        items: list[dict[str, Any]] = []
+        page: str | int | None = 1
+        while page:
+            body = {"albumIds": [album_id], "type": "IMAGE", "size": 1000, "page": int(page)}
+            result = self._request("POST", "/search/metadata", json=body).json()["assets"]
+            items.extend(result.get("items") or [])
+            page = result.get("nextPage")
+        return items
 
     def asset_info(self, asset_id: str) -> dict[str, Any]:
         """Best-effort metadata for display in Home Assistant."""
