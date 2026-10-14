@@ -25,13 +25,36 @@ fi
 # Install system dependencies
 echo "=== Installing system dependencies ==="
 apt-get update
-apt-get install -y imagemagick libheif1 python3-dev swig liblgpio-dev
+apt-get install -y imagemagick libheif1 python3-dev python3-venv python3-pip swig liblgpio-dev
+
+# Enable SPI + I2C (needed by the Inky display) and the SPI overlay Pimoroni recommends
+echo "=== Enabling SPI / I2C ==="
+REBOOT_NEEDED=0
+if command -v raspi-config >/dev/null; then
+    raspi-config nonint do_spi 0
+    raspi-config nonint do_i2c 0
+fi
+BOOT_CFG=/boot/firmware/config.txt
+[ -f "$BOOT_CFG" ] || BOOT_CFG=/boot/config.txt
+if [ -f "$BOOT_CFG" ] && ! grep -q "^dtoverlay=spi0-0cs" "$BOOT_CFG"; then
+    echo "dtoverlay=spi0-0cs" >> "$BOOT_CFG"
+fi
+[ -e /dev/spidev0.0 ] || REBOOT_NEEDED=1
 
 # Create images directory
 echo "=== Creating directories ==="
 mkdir -p "$SCRIPT_DIR/images"
 mkdir -p "$SCRIPT_DIR/logs"
 chown -R "$USER:$USER" "$SCRIPT_DIR/images" "$SCRIPT_DIR/logs"
+
+# Create the virtual environment (with the Pimoroni Inky library) if it doesn't exist yet
+if [ ! -x "$VENV_PATH/bin/pip" ]; then
+    echo "=== Creating virtual environment $VENV_PATH ==="
+    sudo -u "$USER" mkdir -p "$(dirname "$VENV_PATH")"
+    sudo -u "$USER" python3 -m venv "$VENV_PATH"
+    sudo -u "$USER" "$VENV_PATH/bin/pip" install --upgrade pip
+    sudo -u "$USER" "$VENV_PATH/bin/pip" install "inky[rpi]"
+fi
 
 # Install Python dependencies
 echo "=== Installing Python dependencies ==="
@@ -96,7 +119,11 @@ echo "  Status:  sudo systemctl status $SERVICE_NAME"
 echo "  Logs:    tail -f $SCRIPT_DIR/logs/frame.log"
 echo ""
 echo "The service will start automatically on boot."
-echo "To start now, run: sudo systemctl start $SERVICE_NAME"
+if [ "$REBOOT_NEEDED" = 1 ]; then
+    echo "SPI was just enabled: REBOOT the Pi (sudo reboot) before starting the service."
+else
+    echo "To start now, run: sudo systemctl start $SERVICE_NAME"
+fi
 echo ""
 echo "Home Assistant: add the 'Inky Picture Frame' integration (HACS) and enter the API token:"
 echo "  sudo -u $USER $VENV_PATH/bin/python -m frame token   (run from $SCRIPT_DIR)"

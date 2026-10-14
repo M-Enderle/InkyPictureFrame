@@ -47,7 +47,8 @@ class InkyFrameConfigFlow(ConfigFlow, domain=DOMAIN):
             except InkyApiError:
                 errors["base"] = "not_inky_frame"
             else:
-                await self.async_set_unique_id(info["id"])
+                # Manual setup may supersede a pending mDNS discovery of the same frame.
+                await self.async_set_unique_id(info["id"], raise_on_progress=False)
                 self._abort_if_unique_id_configured(
                     updates={
                         CONF_HOST: user_input[CONF_HOST],
