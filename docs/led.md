@@ -27,3 +27,15 @@ LED_GPIO=18
 ```
 
 then `sudo systemctl restart inky-frame`. Brightness and state are remembered across restarts.
+
+## Flicker-free dimming (hardware PWM)
+
+GPIO12 and GPIO18 can use the Pi's hardware PWM. `install.sh` adds the overlay when
+`LED_GPIO` is 12 or 18 (reboot afterwards); manually, add this to `/boot/firmware/config.txt`:
+
+```
+dtoverlay=pwm,pin=18,func=2
+```
+
+Without the overlay the frame falls back to software PWM, which can flicker at the lowest
+brightness levels.

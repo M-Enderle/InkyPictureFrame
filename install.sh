@@ -41,6 +41,21 @@ if [ -f "$BOOT_CFG" ] && ! grep -q "^dtoverlay=spi0-0cs" "$BOOT_CFG"; then
 fi
 [ -e /dev/spidev0.0 ] || REBOOT_NEEDED=1
 
+# Flicker-free LED dimming: enable hardware PWM when LED_GPIO is 12 or 18
+ENV_FILE="$SCRIPT_DIR/frame/.env"
+if [ -f "$ENV_FILE" ] && [ -f "$BOOT_CFG" ]; then
+    LED_PIN="$(sed -n 's/^LED_GPIO=\([0-9]*\).*/\1/p' "$ENV_FILE" | head -1)"
+    case "$LED_PIN" in
+        18) PWM_FUNC=2 ;;
+        12) PWM_FUNC=4 ;;
+        *) PWM_FUNC="" ;;
+    esac
+    if [ -n "$PWM_FUNC" ] && ! grep -q "^dtoverlay=pwm," "$BOOT_CFG"; then
+        echo "dtoverlay=pwm,pin=$LED_PIN,func=$PWM_FUNC" >> "$BOOT_CFG"
+        REBOOT_NEEDED=1
+    fi
+fi
+
 # Create images directory
 echo "=== Creating directories ==="
 mkdir -p "$SCRIPT_DIR/images"

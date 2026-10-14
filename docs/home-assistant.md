@@ -36,7 +36,8 @@ service exposes on the Pi (port `8765`). No MQTT broker is needed.
 | `sensor.inky_frame_photos_in_album` | Album size |
 
 Entity IDs follow the English names above (HA derives them from the system
-language at first setup, so yours may differ — check *Settings → Entities*).
+language at first setup, so yours may differ — and an area can add a prefix, e.g.
+`light.schlafzimmer_inky_frame_led` — check *Settings → Entities*).
 
 A note on "off": e-ink keeps its image without power. *Display off* therefore
 redraws the panel white (one ~30 s refresh) and stops the slideshow.
