@@ -14,6 +14,26 @@ log = logging.getLogger("frame.immich")
 _EXT = {"image/jpeg": ".jpg", "image/webp": ".webp", "image/png": ".png"}
 
 
+def classify(width: float | None, height: float | None) -> str | None:
+    """landscape / portrait / square (within 3 %), None if the size is unknown."""
+    if not width or not height:
+        return None
+    ratio = width / height
+    if 0.97 <= ratio <= 1.03:
+        return "square"
+    return "landscape" if ratio > 1 else "portrait"
+
+
+def _shape(asset: dict[str, Any]) -> str | None:
+    """Shape as displayed, i.e. with the EXIF rotation applied."""
+    exif = asset.get("exifInfo") or {}
+    width = exif.get("exifImageWidth") or asset.get("width")
+    height = exif.get("exifImageHeight") or asset.get("height")
+    if exif.get("orientation") in (5, 6, 7, 8, "5", "6", "7", "8") and exif.get("exifImageWidth"):
+        width, height = height, width
+    return classify(width, height)
+
+
 class ImmichError(Exception):
     """Raised when Immich can't be reached or answers unexpectedly."""
 
@@ -56,8 +76,11 @@ class ImmichClient:
         data = self._get("/albums").json()
         return [{"id": a["id"], "name": a.get("albumName") or a["id"]} for a in data]
 
-    def album_images(self, album_id: str) -> tuple[str, list[str]]:
-        """Return (album name, image asset ids) — videos and trashed items skipped."""
+    def album_images(self, album_id: str) -> tuple[str, list[dict[str, str | None]]]:
+        """Return (album name, [{id, shape}]) — videos and trashed items skipped.
+
+        `shape` is landscape / portrait / square, or None when Immich has no size.
+        """
         if not album_id:
             raise ImmichError("Kein Album ausgewählt (ALBUM_ID)")
         data = self._get(f"/albums/{album_id}").json()
@@ -65,12 +88,12 @@ class ImmichClient:
         assets = data.get("assets") or []  # older Immich versions embed the assets
         if not assets and data.get("assetCount"):
             assets = self._search_album(album_id)
-        ids = [
-            a["id"]
+        images = [
+            {"id": a["id"], "shape": _shape(a)}
             for a in assets
             if a.get("type") == "IMAGE" and not a.get("isTrashed")
         ]
-        return name, ids
+        return name, images
 
     def _search_album(self, album_id: str) -> list[dict[str, Any]]:
         """Newer Immich versions list album assets only via the metadata search."""

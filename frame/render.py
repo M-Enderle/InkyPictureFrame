@@ -7,6 +7,8 @@ from pathlib import Path
 
 from PIL import Image, ImageOps
 
+from .immich import classify
+
 
 def prepare(
     path: Path, resolution: tuple[int, int], orientation: str
@@ -36,3 +38,13 @@ def to_jpeg(image: Image.Image, max_side: int = 960) -> bytes:
     buf = io.BytesIO()
     thumb.save(buf, "JPEG", quality=85)
     return buf.getvalue()
+
+
+def fits(path: Path, orientation: str) -> bool:
+    """True if the photo suits the frame orientation (square photos suit both)."""
+    with Image.open(path) as img:
+        width, height = img.size
+        if img.getexif().get(0x0112) in (5, 6, 7, 8):
+            width, height = height, width
+    shape = classify(width, height)
+    return shape in (None, "square", orientation)

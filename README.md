@@ -130,6 +130,7 @@ InkyPictureFrame/
 1. On startup, `client.py` connects to the Inky display via `inky.auto`.
 2. Every `INTERVAL_MINUTES` (default 15; changeable from Home Assistant) the main loop:
    - Fetches the image asset IDs of the configured Immich album (videos are skipped).
+   - Keeps only photos that match the frame orientation (landscape mode shows landscape photos, portrait mode portrait photos; square photos suit both).
    - Picks the next one from a shuffled bag (no repeats until the album is through).
    - Downloads Immich's display-sized preview (falls back to the original + HEIC→JPEG conversion).
    - Centre-crops and resizes the image to match the display resolution.

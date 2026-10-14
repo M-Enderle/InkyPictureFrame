@@ -57,7 +57,7 @@ class Controller:
         self._status = "starting"
         self._last_error: str | None = None
         self._album_name: str | None = None
-        self._album_ids: list[str] = []
+        self._album_assets: list[dict[str, str | None]] = []
         self._albums: list[dict[str, str]] = []
         self._album_fetched = 0.0
         self._bag: list[str] = []
@@ -115,7 +115,8 @@ class Controller:
                 "orientation": s.get("orientation"),
                 "album_id": s.get("album_id"),
                 "album_name": self._album_name,
-                "album_count": len(self._album_ids),
+                "album_count": len(self._album_assets),
+                "album_matching": len(self._candidates()),
                 "albums": list(self._albums),
                 "current": s.get("current"),
                 "last_change": _iso(s.get("last_change")),
@@ -214,7 +215,9 @@ class Controller:
             s.update(interval_min=min(max(int(new["interval_min"]), MIN_INTERVAL_MIN), MAX_INTERVAL_MIN))
             self._schedule(s.get("last_change"))
         if "orientation" in new and new["orientation"] != s.get("orientation"):
-            s.update(orientation=new["orientation"])
+            # Only photos of the matching shape are shown, so pick a new one.
+            s.update(orientation=new["orientation"], history=[])
+            self._bag = []
             redraw = True
         if "slideshow" in new:
             s.update(slideshow=bool(new["slideshow"]))
@@ -229,8 +232,8 @@ class Controller:
         if "display_on" in new and bool(new["display_on"]) != bool(s.get("display_on")):
             self._power(bool(new["display_on"]))
             return
-        if redraw and s.get("display_on") and self._source_path():
-            self._redraw_current()
+        if redraw and s.get("display_on"):
+            self._advance()
 
     def _power(self, on: bool) -> None:
         s = self.store
@@ -279,20 +282,38 @@ class Controller:
             log.warning("Advance failed: %s", err)
             self._fail(str(err))
 
+    def _candidates(self) -> list[str]:
+        """Album photos that suit the current orientation (square/unknown suit both)."""
+        wanted = self.store.get("orientation")
+        return [
+            a["id"] for a in self._album_assets if a["shape"] in (None, "square", wanted)
+        ]
+
     def _next_asset(self) -> tuple[str, Path]:
-        """Draw from a shuffled bag; skip assets that vanished from Immich."""
-        for _ in range(3):
+        """Draw from a shuffled bag; skip assets that vanished or have the wrong shape."""
+        orientation = self.store.get("orientation")
+        candidates = self._candidates()
+        if not candidates:
+            label = "Querformat" if orientation == "landscape" else "Hochformat"
+            raise ImmichError(f"Das Album enthält keine {label}-Bilder")
+        for _ in range(8):
             if not self._bag:
-                self._bag = random.sample(self._album_ids, len(self._album_ids))
+                self._bag = random.sample(candidates, len(candidates))
                 current = (self.store.get("current") or {}).get("id")
                 if len(self._bag) > 1 and self._bag[-1] == current:
                     self._bag[0], self._bag[-1] = self._bag[-1], self._bag[0]
             asset_id = self._bag.pop()
             try:
-                return asset_id, self._download(asset_id)
+                path = self._download(asset_id)
             except ImmichError as err:
                 log.warning("Skipping asset %s: %s", asset_id, err)
-        raise ImmichError("Kein Bild konnte geladen werden")
+                continue
+            if not render.fits(path, orientation):
+                log.info("Skipping %s: does not fit %s", asset_id, orientation)
+                path.unlink(missing_ok=True)
+                continue
+            return asset_id, path
+        raise ImmichError("Kein passendes Bild konnte geladen werden")
 
     def _download(self, asset_id: str) -> Path:
         if self.immich is None:
@@ -349,7 +370,7 @@ class Controller:
     def _ensure_album(self, force: bool = False) -> None:
         if self.immich is None:
             raise ImmichError("IMMICH_BASE_URL und IMMICH_API_KEY sind nicht gesetzt")
-        if not force and self._album_ids and time.time() - self._album_fetched < ALBUM_TTL:
+        if not force and self._album_assets and time.time() - self._album_fetched < ALBUM_TTL:
             return
         try:
             self._albums = self.immich.albums()
@@ -357,19 +378,20 @@ class Controller:
             log.warning("Could not list albums", exc_info=True)
         album_id = self.store.get("album_id")
         try:
-            name, ids = self.immich.album_images(album_id)
+            name, images = self.immich.album_images(album_id)
         except ImmichError:
-            if self._album_ids:  # keep running from the cached list while Immich is down
+            if self._album_assets:  # keep running from the cached list while Immich is down
                 log.warning("Immich unavailable, using cached album", exc_info=True)
                 return
             raise
-        if not ids:
+        if not images:
             raise ImmichError(f"Album „{name}“ enthält keine Bilder")
-        if set(ids) != set(self._album_ids):
+        if {a["id"] for a in images} != {a["id"] for a in self._album_assets}:
             self._bag = []
-        self._album_name, self._album_ids = name, ids
+        self._album_name, self._album_assets = name, images
         self._album_fetched = time.time()
-        log.info("Album %s: %d images", name, len(ids))
+        log.info("Album %s: %d images (%d fit %s)", name, len(images),
+                 len(self._candidates()), self.store.get("orientation"))
 
     def _schedule(self, last_change: float | None) -> None:
         interval = int(self.store.get("interval_min")) * 60
